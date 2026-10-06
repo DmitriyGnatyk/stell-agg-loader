@@ -1,0 +1,1316 @@
+-- ═══════════════════════════════════════════════════════════
+--  SXNT LOADER — AETHER v6 (FINAL)
+-- ═══════════════════════════════════════════════════════════
+
+local LOADER_SECRET = "ed6c6169286c360de1dd99a4f0935b37e38c30db1fa39953996b6ff1b06c010d"
+local SERVER_URL    = "https://sxnt-mods.up.railway.app"
+local KEY_LINK_URL  = SERVER_URL .. "/"
+local KEY_FILE      = "sxnt_key.txt"
+local LANG_FILE     = "sxnt_lang.txt"
+local AVATAR_ID     = "rbxassetid://127858462734195"
+
+local Players          = game:GetService("Players")
+local HttpService      = game:GetService("HttpService")
+local UserInputService = game:GetService("UserInputService")
+local TweenService     = game:GetService("TweenService")
+local RunService       = game:GetService("RunService")
+local SoundService     = game:GetService("SoundService")
+local Debris           = game:GetService("Debris")
+local LocalPlayer      = Players.LocalPlayer
+
+local IS_MOBILE = UserInputService.TouchEnabled and not UserInputService.KeyboardEnabled
+local VIEWPORT  = workspace.CurrentCamera.ViewportSize
+
+-- ═══════════════════════════════════════════════════════════
+--  NATIVE CRYPTO CORE (виконується нативно, не через VM обфускатора)
+-- ═══════════════════════════════════════════════════════════
+local CRYPTO_SRC = [==[
+local bit = bit32 or bit
+local SHA256_K = {
+    0x428a2f98,0x71374491,0xb5c0fbcf,0xe9b5dba5,0x3956c25b,0x59f111f1,0x923f82a4,0xab1c5ed5,
+    0xd807aa98,0x12835b01,0x243185be,0x550c7dc3,0x72be5d74,0x80deb1fe,0x9bdc06a7,0xc19bf174,
+    0xe49b69c1,0xefbe4786,0x0fc19dc6,0x240ca1cc,0x2de92c6f,0x4a7484aa,0x5cb0a9dc,0x76f988da,
+    0x983e5152,0xa831c66d,0xb00327c8,0xbf597fc7,0xc6e00bf3,0xd5a79147,0x06ca6351,0x14292967,
+    0x27b70a85,0x2e1b2138,0x4d2c6dfc,0x53380d13,0x650a7354,0x766a0abb,0x81c2c92e,0x92722c85,
+    0xa2bfe8a1,0xa81a664b,0xc24b8b70,0xc76c51a3,0xd192e819,0xd6990624,0xf40e3585,0x106aa070,
+    0x19a4c116,0x1e376c08,0x2748774c,0x34b0bcb5,0x391c0cb3,0x4ed8aa4a,0x5b9cca4f,0x682e6ff3,
+    0x748f82ee,0x78a5636f,0x84c87814,0x8cc70208,0x90befffa,0xa4506ceb,0xbef9a3f7,0xc67178f2
+}
+local function sha256(msg)
+    local function rr(x,n) return bit.bor(bit.rshift(x,n), bit.lshift(x,32-n)) end
+    local h = {0x6a09e667,0xbb67ae85,0x3c6ef372,0xa54ff53a,0x510e527f,0x9b05688c,0x1f83d9ab,0x5be0cd19}
+    local msg = tostring(msg); local len = #msg
+    msg = msg .. "\128" .. string.rep("\0", (55-len)%64) .. string.char(
+        bit.band(bit.rshift(len*8,56),0xff), bit.band(bit.rshift(len*8,48),0xff),
+        bit.band(bit.rshift(len*8,40),0xff), bit.band(bit.rshift(len*8,32),0xff),
+        bit.band(bit.rshift(len*8,24),0xff), bit.band(bit.rshift(len*8,16),0xff),
+        bit.band(bit.rshift(len*8,8),0xff),  bit.band(len*8,0xff))
+    for i = 1, #msg, 64 do
+        local w = {}
+        for j = 0, 15 do
+            local a,b,c,d = msg:byte(i+j*4, i+j*4+3)
+            w[j+1] = a*0x1000000 + b*0x10000 + c*0x100 + d
+        end
+        for j = 17, 64 do
+            local s0 = bit.bxor(bit.bxor(rr(w[j-15],7), rr(w[j-15],18)), bit.rshift(w[j-15],3))
+            local s1 = bit.bxor(bit.bxor(rr(w[j-2],17), rr(w[j-2],19)), bit.rshift(w[j-2],10))
+            w[j] = bit.band(w[j-16] + s0 + w[j-7] + s1, 0xffffffff)
+        end
+        local a,b,c,d,e,f,g,h_ = h[1],h[2],h[3],h[4],h[5],h[6],h[7],h[8]
+        for j = 1, 64 do
+            local S1 = bit.bxor(bit.bxor(rr(e,6), rr(e,11)), rr(e,25))
+            local ch = bit.bxor(bit.band(e,f), bit.band(bit.bnot(e),g))
+            local t1 = bit.band(h_ + S1 + ch + SHA256_K[j] + w[j], 0xffffffff)
+            local S0 = bit.bxor(bit.bxor(rr(a,2), rr(a,13)), rr(a,22))
+            local mj = bit.bxor(bit.bxor(bit.band(a,b), bit.band(a,c)), bit.band(b,c))
+            local t2 = bit.band(S0 + mj, 0xffffffff)
+            h_=g; g=f; f=e; e=bit.band(d+t1,0xffffffff); d=c; c=b; b=a; a=bit.band(t1+t2,0xffffffff)
+        end
+        h[1]=bit.band(h[1]+a,0xffffffff); h[2]=bit.band(h[2]+b,0xffffffff)
+        h[3]=bit.band(h[3]+c,0xffffffff); h[4]=bit.band(h[4]+d,0xffffffff)
+        h[5]=bit.band(h[5]+e,0xffffffff); h[6]=bit.band(h[6]+f,0xffffffff)
+        h[7]=bit.band(h[7]+g,0xffffffff); h[8]=bit.band(h[8]+h_,0xffffffff)
+    end
+    return string.format("%08x%08x%08x%08x%08x%08x%08x%08x", h[1],h[2],h[3],h[4],h[5],h[6],h[7],h[8])
+end
+
+local B64 = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/'
+local function b64decode(data)
+    if typeof(base64_decode) == "function" then return base64_decode(data) end
+    if crypt and crypt.base64decode then return crypt.base64decode(data) end
+    data = data:gsub('[^'..B64..'=]', '')
+    local bits = data:gsub('.', function(x)
+        if x == '=' then return '' end
+        local r,f = '', (B64:find(x, 1, true) - 1)
+        for i = 6,1,-1 do r = r .. (f % 2^i - f % 2^(i-1) > 0 and '1' or '0') end
+        return r
+    end)
+    return (bits:gsub('%d%d%d?%d?%d?%d?%d?%d?', function(x)
+        if #x ~= 8 then return '' end
+        local c = 0
+        for i = 1,8 do c = c + (x:sub(i,i)=='1' and 2^(8-i) or 0) end
+        return string.char(c)
+    end))
+end
+
+local function xor_decrypt(ct, material)
+    local n = #ct
+    local blocks_needed = math.ceil(n / 32)
+    local ks = {}
+    for i = 0, blocks_needed - 1 do
+        local cnt = string.char(
+            bit.band(bit.rshift(i, 24), 0xff),
+            bit.band(bit.rshift(i, 16), 0xff),
+            bit.band(bit.rshift(i, 8), 0xff),
+            bit.band(i, 0xff)
+        )
+        local hex = sha256(material .. cnt)
+        local base = i * 32
+        for k = 1, 64, 2 do
+            ks[base + (k - 1) / 2 + 1] = string.char(tonumber(hex:sub(k, k+1), 16))
+        end
+    end
+    local keystream = table.concat(ks)
+    local out = {}
+    local CHUNK = 8192
+    local idx = 1
+    for start = 1, n, CHUNK do
+        local stop = math.min(start + CHUNK - 1, n)
+        local piece = {}
+        for j = start, stop do
+            piece[j - start + 1] = string.char(bit.bxor(ct:byte(j), keystream:byte(j)))
+        end
+        out[idx] = table.concat(piece)
+        idx = idx + 1
+        if (start - 1) % 16384 == 0 then task.wait() end
+    end
+    return table.concat(out)
+end
+
+return { sha256 = sha256, b64decode = b64decode, xor_decrypt = xor_decrypt }
+]==]
+
+local Crypto = loadstring(CRYPTO_SRC)()
+local sha256 = Crypto.sha256
+local b64decode = Crypto.b64decode
+local xor_decrypt = Crypto.xor_decrypt
+-- ═══════════════════════════════════════════════════════════
+
+-- ═══════════ HWID / HTTP / STORAGE ═══════════
+local function getHWID()
+    local hwid
+    pcall(function() hwid = game:GetService("RbxAnalyticsService"):GetClientId() end)
+    if hwid and hwid ~= "" then return "rbx_" .. hwid end
+    pcall(function() if typeof(gethwid)=="function" then hwid = gethwid() end end)
+    if hwid and hwid ~= "" then return "exec_" .. hwid end
+    pcall(function() if isfile("sxnt_hwid.txt") then hwid = readfile("sxnt_hwid.txt") end end)
+    if hwid and hwid ~= "" then return hwid end
+    hwid = tostring(os.time()).."_"..tostring(math.random(1,999999999))
+    pcall(function() writefile("sxnt_hwid.txt", hwid) end)
+    return hwid
+end
+local function httpPost(url, body)
+    local h = {["Content-Type"]="application/json", ["User-Agent"]="SXNT-Loader/6.0"}
+    if typeof(request)=="function" then
+        local ok,res = pcall(request, {Url=url,Method="POST",Headers=h,Body=body})
+        if ok and res and res.Body then return res.StatusCode,res.Body end
+    end
+    if syn and syn.request then
+        local ok,res = pcall(syn.request, {Url=url,Method="POST",Headers=h,Body=body})
+        if ok and res and res.Body then return res.StatusCode,res.Body end
+    end
+    if http and typeof(http.request)=="function" then
+        local ok,res = pcall(http.request, {Url=url,Method="POST",Headers=h,Body=body})
+        if ok and res and res.Body then return res.StatusCode,res.Body end
+    end
+    local ok,res = pcall(function() return HttpService:RequestAsync({Url=url,Method="POST",Headers=h,Body=body}) end)
+    if ok and res and res.Body then return res.StatusCode,res.Body end
+    return nil,nil
+end
+local function httpGet(url)
+    if typeof(request)=="function" then
+        local ok,res = pcall(request, {Url=url,Method="GET"})
+        if ok and res and res.Body then return res.StatusCode,res.Body end
+    end
+    if syn and syn.request then
+        local ok,res = pcall(syn.request, {Url=url,Method="GET"})
+        if ok and res and res.Body then return res.StatusCode,res.Body end
+    end
+    local ok,res = pcall(function() return HttpService:RequestAsync({Url=url,Method="GET"}) end)
+    if ok and res and res.Body then return res.StatusCode,res.Body end
+    return nil,nil
+end
+local function loadKey() local k; pcall(function() if isfile(KEY_FILE) then k = readfile(KEY_FILE) end end); return k end
+local function saveKey(k) pcall(function() writefile(KEY_FILE, k) end) end
+local function delKey() pcall(function() if isfile(KEY_FILE) then delfile(KEY_FILE) end end) end
+
+-- ═══════════ SOUND (rbxasset:// = вбудовані, завжди працюють) ═══════════
+local SOUND_HOVER   = "rbxassetid://sounds/switch.wav"
+local SOUND_CLICK   = "rbxassetid://87437544236708"
+local SOUND_SUCCESS = "rbxassetid://106771092997108"
+local SOUND_ERROR   = "rbxassetid://131661013076677"
+
+local function playSound(id, vol, pitch)
+    pcall(function()
+        local s = Instance.new("Sound")
+        s.SoundId = id
+        s.Volume = vol or 0.4
+        s.PlaybackSpeed = pitch or 1
+        s.Parent = SoundService
+        s:Play()
+        Debris:AddItem(s, 3)
+    end)
+end
+local function hoverSound() playSound(SOUND_HOVER, 0.25, 1.0) end
+local function clickSound() playSound(SOUND_CLICK, 0.4, 1.0) end
+local function successSound() playSound(SOUND_SUCCESS, 0.6, 1.0) end
+local function errorSound() playSound(SOUND_ERROR, 0.5, 0.9) end
+
+-- ═══════════ LOCALIZATION ═══════════
+local L = {
+    ENG = {
+        brand="SXNT", tagline="Secure Activation",
+        step1="Copy the link",
+        step1_body="Click the button to copy the link, open it in your browser and complete verification to get your key.",
+        step2="Paste your key",
+        step2_body="Paste the key you received on the website below.",
+        step3="Activate", step3_body="Click the button below or press Enter to unlock the menu.",
+        get_btn="Copy Link",
+        paste_btn="Paste", activate="Activate",
+        copied="Link copied!",
+        status_idle="Ready to activate",
+        status_checking="Verifying your key...",
+        status_success="Access granted",
+        no_key="Please enter a key first",
+        err_invalid="Invalid or expired key", err_net="Connection error — check your internet",
+        err_expired="Key expired — get a new one", err_banned="Key banned by admin",
+        err_hwid="Key linked to another PC", err_inactive="Key disabled by admin",
+        err_rate="Too many attempts, wait a minute",
+        footer="Key valid for 24 hours",
+        hint_enter="Press Enter to activate  ·  Esc to close",
+        key_preview="Your key:",
+    },
+    UA = {
+        brand="SXNT", tagline="Безпечна активація",
+        step1="Скопіюйте посилання",
+        step1_body="Натисніть кнопку щоб скопіювати посилання, відкрийте його у браузері та пройдіть перевірку щоб отримати ключ.",
+        step2="Вставте ключ",
+        step2_body="Вставте отриманий на сайті ключ нижче.",
+        step3="Активація", step3_body="Натисніть кнопку нижче або Enter щоб розблокувати меню.",
+        get_btn="Скопіювати",
+        paste_btn="Вставити", activate="Активувати",
+        copied="Посилання скопійовано!",
+        status_idle="Готово до активації",
+        status_checking="Перевірка ключа...",
+        status_success="Доступ дозволено",
+        no_key="Спочатку введіть ключ",
+        err_invalid="Невірний ключ", err_net="Помилка з'єднання — перевірте інтернет",
+        err_expired="Ключ прострочено — отримайте новий", err_banned="Ключ заблоковано адміном",
+        err_hwid="Прив'язаний до іншого ПК", err_inactive="Вимкнено адміном",
+        err_rate="Забагато спроб, зачекайте хвилину",
+        footer="Ключ діє 24 години",
+        hint_enter="Enter — активувати  ·  Esc — закрити",
+        key_preview="Ваш ключ:",
+    },
+    TR = {
+        brand="SXNT", tagline="Güvenli Aktivasyon",
+        step1="Bağlantıyı kopyala",
+        step1_body="Butona basarak bağlantıyı kopyala, tarayıcıda aç ve doğrulamayı tamamlayarak anahtarını al.",
+        step2="Anahtarı yapıştır",
+        step2_body="Siteden aldığın anahtarı aşağıya yapıştır.",
+        step3="Etkinleştir", step3_body="Menüyü açmak için aşağıdaki butona veya Enter'a bas.",
+        get_btn="Kopyala",
+        paste_btn="Yapıştır", activate="Etkinleştir",
+        copied="Bağlantı kopyalandı!",
+        status_idle="Aktivasyona hazır",
+        status_checking="Doğrulanıyor...",
+        status_success="Erişim verildi",
+        no_key="Önce bir anahtar gir",
+        err_invalid="Geçersiz anahtar", err_net="Bağlantı hatası — internetini kontrol et",
+        err_expired="Süresi doldu — yeni bir tane al", err_banned="Yasaklandı",
+        err_hwid="Başka PC'ye bağlı", err_inactive="Kapatıldı",
+        err_rate="Çok fazla deneme, bir dakika bekle",
+        footer="Anahtar 24 saat geçerli",
+        hint_enter="Enter — etkinleştir  ·  Esc — kapat",
+        key_preview="Anahtarın:",
+    },
+    RUS = {
+        brand="SXNT", tagline="Безопасная активация",
+        step1="Скопируйте ссылку",
+        step1_body="Нажмите кнопку чтобы скопировать ссылку, откройте её в браузере и пройдите проверку чтобы получить ключ.",
+        step2="Вставьте ключ",
+        step2_body="Вставьте полученный на сайте ключ ниже.",
+        step3="Активация", step3_body="Нажмите кнопку ниже или Enter чтобы разблокировать меню.",
+        get_btn="Скопировать",
+        paste_btn="Вставить", activate="Активировать",
+        copied="Ссылка скопирована!",
+        status_idle="Готово к активации",
+        status_checking="Проверка ключа...",
+        status_success="Доступ разрешён",
+        no_key="Сначала введите ключ",
+        err_invalid="Неверный ключ", err_net="Ошибка соединения — проверьте интернет",
+        err_expired="Ключ просрочен — получите новый", err_banned="Заблокирован админом",
+        err_hwid="Привязан к другому ПК", err_inactive="Отключён админом",
+        err_rate="Слишком много попыток, подождите минуту",
+        footer="Ключ действует 24 часа",
+        hint_enter="Enter — активировать  ·  Esc — закрыть",
+        key_preview="Ваш ключ:",
+    },
+}
+local VALID_LANGS = {ENG=true,UA=true,TR=true,RUS=true}
+local function loadLang()
+    local l; pcall(function() if isfile(LANG_FILE) then l = readfile(LANG_FILE) end end)
+    if l and VALID_LANGS[l:gsub("%s+","")] then return l:gsub("%s+","") end
+    return "ENG"
+end
+local function saveLang(l) if VALID_LANGS[l] then pcall(function() writefile(LANG_FILE, l) end) end end
+local currentLang = loadLang()
+
+-- ═══════════ THEME ═══════════
+local C = {
+    bg        = Color3.fromRGB(8, 8, 12),
+    surface   = Color3.fromRGB(16, 17, 24),
+    surface2  = Color3.fromRGB(22, 24, 34),
+    surface3  = Color3.fromRGB(30, 32, 45),
+    accent    = Color3.fromRGB(85, 145, 255),
+    accent2   = Color3.fromRGB(140, 90, 255),
+    green     = Color3.fromRGB(60, 220, 130),
+    red       = Color3.fromRGB(255, 85, 105),
+    yellow    = Color3.fromRGB(255, 200, 80),
+    text      = Color3.fromRGB(245, 247, 255),
+    text2     = Color3.fromRGB(180, 185, 200),
+    muted     = Color3.fromRGB(140, 145, 170),
+    mutedDark = Color3.fromRGB(110, 115, 135),
+    border    = Color3.fromRGB(40, 44, 58),
+    borderLt  = Color3.fromRGB(55, 60, 78),
+}
+
+-- ═══════════ HELPERS ═══════════
+local connections = {}
+local function track(c) table.insert(connections, c); return c end
+local function cleanup()
+    for _, c in ipairs(connections) do pcall(function() c:Disconnect() end) end
+    connections = {}
+end
+
+local function tw(obj, dur, props, style, dir)
+    local t = TweenService:Create(obj, TweenInfo.new(dur, style or Enum.EasingStyle.Quint, dir or Enum.EasingDirection.Out), props)
+    t:Play(); return t
+end
+
+local function corner(p, r) local c = Instance.new("UICorner", p); c.CornerRadius = UDim.new(0, r or 8); return c end
+local function cornerPct(p, pct) local c = Instance.new("UICorner", p); c.CornerRadius = UDim.new(pct or 1, 0); return c end
+local function stroke(p, col, th, tr)
+    local s = Instance.new("UIStroke", p)
+    s.Color = col or C.border; s.Thickness = th or 1; s.Transparency = tr or 0
+    s.ApplyStrokeMode = Enum.ApplyStrokeMode.Border
+    return s
+end
+local function grad(p, c1, c2, rot)
+    local g = Instance.new("UIGradient", p)
+    g.Color = ColorSequence.new({ColorSequenceKeypoint.new(0,c1), ColorSequenceKeypoint.new(1,c2)})
+    g.Rotation = rot or 0
+    return g
+end
+
+local function attachRipple(btn, color)
+    btn.ClipsDescendants = true
+    btn.MouseButton1Down:Connect(function()
+        local mouse = UserInputService:GetMouseLocation()
+        local ap = btn.AbsolutePosition
+        local relX, relY = mouse.X - ap.X, mouse.Y - ap.Y
+        if relX < 0 or relY < 0 or relX > btn.AbsoluteSize.X or relY > btn.AbsoluteSize.Y then
+            relX, relY = btn.AbsoluteSize.X / 2, btn.AbsoluteSize.Y / 2
+        end
+        local r = Instance.new("Frame", btn)
+        r.AnchorPoint = Vector2.new(0.5, 0.5)
+        r.Position = UDim2.new(0, relX, 0, relY)
+        r.Size = UDim2.new(0, 0, 0, 0)
+        r.BackgroundColor3 = color or Color3.new(1,1,1)
+        r.BackgroundTransparency = 0.75
+        r.BorderSizePixel = 0
+        r.ZIndex = btn.ZIndex + 1
+        cornerPct(r, 1)
+        local c1 = math.sqrt(relX^2 + relY^2)
+        local c2 = math.sqrt((btn.AbsoluteSize.X - relX)^2 + relY^2)
+        local c3 = math.sqrt(relX^2 + (btn.AbsoluteSize.Y - relY)^2)
+        local c4 = math.sqrt((btn.AbsoluteSize.X - relX)^2 + (btn.AbsoluteSize.Y - relY)^2)
+        local maxD = math.max(c1, math.max(c2, math.max(c3, c4))) * 2
+        tw(r, 0.55, {Size = UDim2.new(0, maxD, 0, maxD), BackgroundTransparency = 1}, Enum.EasingStyle.Quad, Enum.EasingDirection.Out)
+        task.delay(0.6, function() if r.Parent then r:Destroy() end end)
+    end)
+end
+
+local function attachHoverSound(btn)
+    btn.MouseEnter:Connect(hoverSound)
+end
+
+local function shakeElement(el, intensity, dur)
+    local base = el.Position
+    task.spawn(function()
+        local start = tick()
+        while tick() - start < dur do
+            if not el.Parent then return end
+            local t = (tick() - start) / dur
+            local decay = (1 - t) * (1 - t)
+            local x = math.sin(tick() * 55) * intensity * decay
+            local y = math.cos(tick() * 48) * intensity * decay * 0.35
+            el.Position = UDim2.new(base.X.Scale, math.floor(base.X.Offset + x), base.Y.Scale, math.floor(base.Y.Offset + y))
+            RunService.RenderStepped:Wait()
+        end
+        if el.Parent then el.Position = base end
+    end)
+end
+
+local function isValidKeyFormat(s)
+    return s:match("^SXNT%-%w%w%w%w%-%w%w%w%w%-%w%w%w%w$") ~= nil
+end
+
+-- ═══════════ LAUNCH MAIN ═══════════
+local function launchMain(key)
+    -- 1. Завантажуємо скрипт з GitHub
+    local SCRIPT_URL = "https://raw.githubusercontent.com/DmitriyGnatyk/steall-agg-pbl/refs/heads/main/1"
+    
+    local ok, scriptSource = pcall(function()
+        return game:HttpGet(SCRIPT_URL)
+    end)
+    
+    if not ok or not scriptSource or scriptSource == "" then
+        warn("[SXNT] Failed to download script from GitHub")
+        return false
+    end
+    
+    -- 2. Виконуємо отриманий код
+    local fn, err = loadstring(scriptSource)
+    if not fn then 
+        warn("[SXNT] Syntax error in downloaded script: "..tostring(err))
+        return false 
+    end
+    
+    local ok2, execErr = pcall(fn)
+    if not ok2 then 
+        warn("[SXNT] Execution error: "..tostring(execErr))
+        return false
+    end
+    
+    return true
+end
+
+-- ═══════════ PRE-CHECK FLOW ═══════════
+local function findExistingKey()
+    local savedKey = loadKey()
+    if savedKey and savedKey ~= "" then
+        local hwid = getHWID()
+        local _, body = httpGet(SERVER_URL .. "/validate?key=" .. savedKey .. "&hwid=" .. hwid)
+        local ok, data = pcall(HttpService.JSONDecode, HttpService, body or "{}")
+        if ok and data and data.valid then
+            return savedKey
+        end
+    end
+
+    local hwid = getHWID()
+    local _, body = httpGet(SERVER_URL .. "/hwid-lookup?hwid=" .. hwid)
+    local ok, data = pcall(HttpService.JSONDecode, HttpService, body or "{}")
+    if ok and data and data.found and data.key then
+        saveKey(data.key)
+        return data.key
+    end
+
+    if savedKey and savedKey ~= "" then
+        delKey()
+    end
+    return nil
+end
+
+-- ═══════════ UI ═══════════
+local function buildUI(onActivated)
+    local T = L[currentLang] or L.ENG
+    cleanup()
+
+    local gui = Instance.new("ScreenGui")
+    gui.Name = "SXNT_Loader"
+    gui.ResetOnSpawn = false
+    gui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
+    gui.IgnoreGuiInset = true
+    gui.DisplayOrder = 999999
+    pcall(function() gui.Parent = game:GetService("CoreGui") end)
+    if not gui.Parent then gui.Parent = LocalPlayer:WaitForChild("PlayerGui") end
+
+    -- BACKDROP
+    local back = Instance.new("Frame", gui)
+    back.Size = UDim2.new(1, 0, 1, 0)
+    back.BackgroundColor3 = C.bg
+    back.BackgroundTransparency = 1
+    back.BorderSizePixel = 0
+    back.ZIndex = 1
+    tw(back, 0.9, {BackgroundTransparency = 0.35})
+
+    -- AURORA
+    local aurora = Instance.new("Frame", gui)
+    aurora.Size = UDim2.new(1, 0, 1, 0)
+    aurora.BackgroundTransparency = 1
+    aurora.ZIndex = 3
+    aurora.ClipsDescendants = true
+
+    local blobs = {}
+    local blobCfgs = {
+        {size=650, col=C.accent,  x=-300, y=-380, sx=0.08, sy=0.06, ph=0},
+        {size=750, col=C.accent2, x=-200, y=-250, sx=0.10, sy=0.11, ph=1.7},
+        {size=500, col=C.accent,  x=  80, y=-400, sx=0.07, sy=0.09, ph=3.3},
+    }
+    for i, cfg in ipairs(blobCfgs) do
+        local blob = Instance.new("Frame", aurora)
+        blob.Size = UDim2.new(0, cfg.size, 0, cfg.size)
+        blob.Position = UDim2.new(0.5, cfg.x, 0.5, cfg.y)
+        blob.BackgroundColor3 = cfg.col
+        blob.BackgroundTransparency = 0.93
+        blob.BorderSizePixel = 0
+        blob.ZIndex = 3
+        cornerPct(blob, 1)
+        table.insert(blobs, {obj=blob, cfg=cfg, baseX=cfg.x, baseY=cfg.y})
+    end
+    local blobTick = 0
+    track(RunService.RenderStepped:Connect(function()
+        blobTick = blobTick + 1
+        if blobTick % 3 ~= 0 then return end
+        local t = tick()
+        for _, b in ipairs(blobs) do
+            if not b.obj.Parent then return end
+            local dx = math.sin(t * b.cfg.sx + b.cfg.ph) * 60
+            local dy = math.cos(t * b.cfg.sy + b.cfg.ph) * 45
+            b.obj.Position = UDim2.new(0.5, math.floor(b.baseX + dx), 0.5, math.floor(b.baseY + dy))
+        end
+    end))
+
+    -- LAYOUT
+    local CARD_W = 460
+    local CARD_H = 585
+    local DOT_SZ = 28
+    local timelineX = 22 + 14
+
+    -- SHADOW
+    local shadow1 = Instance.new("Frame", gui)
+    shadow1.AnchorPoint = Vector2.new(0.5, 0.5)
+    shadow1.Position = UDim2.new(0.5, 0, 0.5, 12)
+    shadow1.Size = UDim2.new(0, CARD_W + 24, 0, CARD_H + 24)
+    shadow1.BackgroundColor3 = Color3.new(0, 0, 0)
+    shadow1.BackgroundTransparency = 0.82
+    shadow1.BorderSizePixel = 0
+    shadow1.ZIndex = 9
+    corner(shadow1, 26)
+
+    -- CARD
+    local card = Instance.new("Frame", gui)
+    card.AnchorPoint = Vector2.new(0.5, 0.5)
+    card.Position = UDim2.new(0.5, 0, 0.5, 0)
+    card.Size = UDim2.new(0, 0, 0, 0)
+    card.BackgroundColor3 = Color3.fromRGB(14, 15, 22)
+    card.BackgroundTransparency = 0
+    card.BorderSizePixel = 0
+    card.ClipsDescendants = true
+    card.ZIndex = 10
+    corner(card, 20)
+    stroke(card, C.border, 1, 0.35)
+
+    if IS_MOBILE then
+        local s = math.min(1, (VIEWPORT.X * 0.95) / CARD_W, (VIEWPORT.Y * 0.95) / CARD_H)
+        if s < 1 then Instance.new("UIScale", card).Scale = s end
+    end
+
+    local content = Instance.new("Frame", card)
+    content.Size = UDim2.new(1, 0, 1, 0)
+    content.BackgroundTransparency = 1
+    content.ZIndex = 12
+
+    -- HEADER
+    local headerY = 20
+
+    local logo = Instance.new("Frame", content)
+    logo.Size = UDim2.new(0, 44, 0, 44)
+    logo.Position = UDim2.new(0, 22, 0, headerY - 2)
+    logo.BackgroundColor3 = C.accent
+    logo.BorderSizePixel = 0
+    logo.ZIndex = 14
+    corner(logo, 13)
+    grad(logo, C.accent, C.accent2, 135)
+
+    local logoFallback = Instance.new("TextLabel", logo)
+    logoFallback.Text = "S"
+    logoFallback.Font = Enum.Font.GothamBlack
+    logoFallback.TextSize = 22
+    logoFallback.TextColor3 = Color3.new(1, 1, 1)
+    logoFallback.Size = UDim2.new(1, 0, 1, 0)
+    logoFallback.BackgroundTransparency = 1
+    logoFallback.ZIndex = 15
+
+    local avatarImg = Instance.new("ImageLabel", logo)
+    avatarImg.Size = UDim2.new(1, 0, 1, 0)
+    avatarImg.BackgroundTransparency = 1
+    avatarImg.Image = AVATAR_ID
+    avatarImg.ZIndex = 16
+    corner(avatarImg, 13)
+    avatarImg:GetPropertyChangedSignal("IsLoaded"):Connect(function()
+        if avatarImg.IsLoaded then
+            tw(logoFallback, 0.3, {TextTransparency = 1})
+        end
+    end)
+    task.delay(1, function()
+        if avatarImg.IsLoaded then
+            tw(logoFallback, 0.3, {TextTransparency = 1})
+        end
+    end)
+
+    local titleLbl = Instance.new("TextLabel", content)
+    titleLbl.Text = T.brand
+    titleLbl.Font = Enum.Font.GothamBold
+    titleLbl.TextSize = 18
+    titleLbl.TextColor3 = C.text
+    titleLbl.Size = UDim2.new(1, -140, 0, 22)
+    titleLbl.Position = UDim2.new(0, 80, 0, headerY + 2)
+    titleLbl.BackgroundTransparency = 1
+    titleLbl.TextXAlignment = Enum.TextXAlignment.Left
+    titleLbl.ZIndex = 14
+
+    local tagline = Instance.new("TextLabel", content)
+    tagline.Text = T.tagline
+    tagline.Font = Enum.Font.Gotham
+    tagline.TextSize = 11
+    tagline.TextColor3 = C.muted
+    tagline.Size = UDim2.new(1, -140, 0, 16)
+    tagline.Position = UDim2.new(0, 80, 0, headerY + 22)
+    tagline.BackgroundTransparency = 1
+    tagline.TextXAlignment = Enum.TextXAlignment.Left
+    tagline.ZIndex = 14
+
+    -- CLOSE BUTTON (простий X)
+    local close = Instance.new("TextButton", content)
+    close.Text = "X"
+    close.Font = Enum.Font.GothamBold
+    close.TextSize = 15
+    close.TextColor3 = C.muted
+    close.Size = UDim2.new(0, 30, 0, 30)
+    close.Position = UDim2.new(1, -42, 0, headerY + 5)
+    close.BackgroundColor3 = C.surface3
+    close.BackgroundTransparency = 1
+    close.BorderSizePixel = 0
+    close.AutoButtonColor = false
+    close.ZIndex = 14
+    corner(close, 10)
+    close.MouseEnter:Connect(function()
+        hoverSound()
+        tw(close, 0.25, {BackgroundTransparency = 0, BackgroundColor3 = C.red, TextColor3 = Color3.new(1,1,1)})
+    end)
+    close.MouseLeave:Connect(function()
+        tw(close, 0.25, {BackgroundTransparency = 1, TextColor3 = C.muted})
+    end)
+
+    local function closeUI()
+        clickSound()
+        cleanup()
+        gui:Destroy()
+    end
+    close.MouseButton1Click:Connect(closeUI)
+
+    local divY = headerY + 62
+    local div = Instance.new("Frame", content)
+    div.Size = UDim2.new(1, -44, 0, 1)
+    div.Position = UDim2.new(0, 22, 0, divY)
+    div.BackgroundColor3 = C.border
+    div.BackgroundTransparency = 0.3
+    div.BorderSizePixel = 0
+    div.ZIndex = 13
+
+    -- TIMELINE
+    local s1Y = divY + 26
+    local s2Y = s1Y + 120
+    local s3Y = s2Y + 120
+
+    local trackTop = s1Y + DOT_SZ
+    local trackBottom = s3Y + DOT_SZ
+    local trackH = trackBottom - trackTop
+    local fillStep1 = (s2Y + DOT_SZ/2) - trackTop
+    local fillStep2 = (s3Y + DOT_SZ/2) - trackTop
+    local fillStep3 = trackH
+
+    local timelineTrack = Instance.new("Frame", content)
+    timelineTrack.Size = UDim2.new(0, 2, 0, trackH)
+    timelineTrack.Position = UDim2.new(0, timelineX - 1, 0, trackTop)
+    timelineTrack.BackgroundColor3 = C.border
+    timelineTrack.BorderSizePixel = 0
+    timelineTrack.ZIndex = 13
+    cornerPct(timelineTrack, 1)
+
+    local timelineFill = Instance.new("Frame", timelineTrack)
+    timelineFill.Size = UDim2.new(1, 0, 0, 0)
+    timelineFill.Position = UDim2.new(0, 0, 0, 0)
+    timelineFill.BackgroundColor3 = C.accent
+    timelineFill.BorderSizePixel = 0
+    timelineFill.ZIndex = 14
+    cornerPct(timelineFill, 1)
+    grad(timelineFill, C.accent, C.accent2, 90)
+
+    local function makeStep(y, num)
+        local dot = Instance.new("Frame", content)
+        dot.Size = UDim2.new(0, DOT_SZ, 0, DOT_SZ)
+        dot.Position = UDim2.new(0, timelineX - DOT_SZ/2, 0, y)
+        dot.BackgroundColor3 = C.surface2
+        dot.BorderSizePixel = 0
+        dot.ZIndex = 15
+        cornerPct(dot, 1)
+        local s = stroke(dot, C.border, 1.5, 0)
+        local lbl = Instance.new("TextLabel", dot)
+        lbl.Text = num
+        lbl.Font = Enum.Font.GothamBold
+        lbl.TextSize = 12
+        lbl.TextColor3 = C.muted
+        lbl.Size = UDim2.new(1, 0, 1, 0)
+        lbl.BackgroundTransparency = 1
+        lbl.ZIndex = 16
+        return {dot=dot, stroke=s, num=lbl, y=y}
+    end
+
+    local s1 = makeStep(s1Y, "1")
+    local s2 = makeStep(s2Y, "2")
+    local s3 = makeStep(s3Y, "3")
+
+    local function pulseStep(step)
+        local targetSz = DOT_SZ * 2.6
+        local offset = (targetSz - DOT_SZ) / 2
+        local pulse = Instance.new("Frame", content)
+        pulse.Size = UDim2.new(0, DOT_SZ, 0, DOT_SZ)
+        pulse.Position = UDim2.new(0, step.dot.Position.X.Offset, 0, step.dot.Position.Y.Offset)
+        pulse.BackgroundColor3 = C.accent
+        pulse.BackgroundTransparency = 0.55
+        pulse.BorderSizePixel = 0
+        pulse.ZIndex = 14
+        cornerPct(pulse, 1)
+        tw(pulse, 0.8, {
+            Size = UDim2.new(0, targetSz, 0, targetSz),
+            Position = UDim2.new(0, step.dot.Position.X.Offset - offset, 0, step.dot.Position.Y.Offset - offset),
+            BackgroundTransparency = 1
+        }, Enum.EasingStyle.Quint)
+        task.delay(0.9, function() if pulse.Parent then pulse:Destroy() end end)
+    end
+
+    local function markStepDone(step, silent)
+        if not silent then successSound() end
+        tw(step.dot, 0.35, {BackgroundColor3 = C.accent}, Enum.EasingStyle.Back)
+        tw(step.stroke, 0.3, {Transparency = 1})
+        tw(step.num, 0.3, {TextColor3 = Color3.new(1,1,1)})
+        pulseStep(step)
+    end
+
+    local function resetStep(step)
+        tw(step.dot, 0.3, {BackgroundColor3 = C.surface2})
+        tw(step.stroke, 0.3, {Transparency = 0})
+        tw(step.num, 0.3, {TextColor3 = C.muted})
+    end
+
+    -- STEP 1
+    local s1Title = Instance.new("TextLabel", content)
+    s1Title.Text = T.step1
+    s1Title.Font = Enum.Font.GothamBold
+    s1Title.TextSize = 14
+    s1Title.TextColor3 = C.text
+    s1Title.Size = UDim2.new(1, -100, 0, 22)
+    s1Title.Position = UDim2.new(0, timelineX + 22, 0, s1Y)
+    s1Title.BackgroundTransparency = 1
+    s1Title.TextXAlignment = Enum.TextXAlignment.Left
+    s1Title.ZIndex = 14
+
+    local s1Body = Instance.new("TextLabel", content)
+    s1Body.Text = T.step1_body
+    s1Body.Font = Enum.Font.Gotham
+    s1Body.TextSize = 11
+    s1Body.TextColor3 = C.muted
+    s1Body.Size = UDim2.new(1, -100, 0, 40)
+    s1Body.Position = UDim2.new(0, timelineX + 22, 0, s1Y + 22)
+    s1Body.BackgroundTransparency = 1
+    s1Body.TextXAlignment = Enum.TextXAlignment.Left
+    s1Body.TextYAlignment = Enum.TextYAlignment.Top
+    s1Body.TextWrapped = true
+    s1Body.LineHeight = 1.2
+    s1Body.ZIndex = 14
+
+    local getBtn = Instance.new("TextButton", content)
+    getBtn.Text = T.get_btn
+    getBtn.Font = Enum.Font.GothamBold
+    getBtn.TextSize = 12
+    getBtn.TextColor3 = Color3.new(1, 1, 1)
+    getBtn.TextXAlignment = Enum.TextXAlignment.Center
+    getBtn.Size = UDim2.new(1, -100, 0, 36)
+    getBtn.Position = UDim2.new(0, timelineX + 22, 0, s1Y + 62)
+    getBtn.BackgroundColor3 = C.accent
+    getBtn.BorderSizePixel = 0
+    getBtn.AutoButtonColor = false
+    getBtn.ZIndex = 15
+    corner(getBtn, 10)
+    grad(getBtn, C.accent, C.accent2, 45)
+
+    attachRipple(getBtn, Color3.new(1,1,1))
+    attachHoverSound(getBtn)
+
+    getBtn.MouseEnter:Connect(function()
+        tw(getBtn, 0.2, {Size = UDim2.new(1, -96, 0, 36)}, Enum.EasingStyle.Quint)
+    end)
+    getBtn.MouseLeave:Connect(function()
+        tw(getBtn, 0.2, {Size = UDim2.new(1, -100, 0, 36)}, Enum.EasingStyle.Quint)
+    end)
+
+    -- STEP 2
+    local s2Title = Instance.new("TextLabel", content)
+    s2Title.Text = T.step2
+    s2Title.Font = Enum.Font.GothamBold
+    s2Title.TextSize = 14
+    s2Title.TextColor3 = C.text
+    s2Title.Size = UDim2.new(1, -100, 0, 22)
+    s2Title.Position = UDim2.new(0, timelineX + 22, 0, s2Y)
+    s2Title.BackgroundTransparency = 1
+    s2Title.TextXAlignment = Enum.TextXAlignment.Left
+    s2Title.ZIndex = 14
+
+    local s2Body = Instance.new("TextLabel", content)
+    s2Body.Text = T.step2_body
+    s2Body.Font = Enum.Font.Gotham
+    s2Body.TextSize = 11
+    s2Body.TextColor3 = C.muted
+    s2Body.Size = UDim2.new(1, -100, 0, 22)
+    s2Body.Position = UDim2.new(0, timelineX + 22, 0, s2Y + 22)
+    s2Body.BackgroundTransparency = 1
+    s2Body.TextXAlignment = Enum.TextXAlignment.Left
+    s2Body.TextYAlignment = Enum.TextYAlignment.Top
+    s2Body.TextWrapped = true
+    s2Body.ZIndex = 14
+
+    local inputWrap = Instance.new("Frame", content)
+    inputWrap.Size = UDim2.new(1, -100, 0, 40)
+    inputWrap.Position = UDim2.new(0, timelineX + 22, 0, s2Y + 52)
+    inputWrap.BackgroundColor3 = C.surface2
+    inputWrap.BorderSizePixel = 0
+    inputWrap.ZIndex = 15
+    corner(inputWrap, 11)
+    local inputStroke = stroke(inputWrap, C.border, 1.2, 0)
+
+    local input = Instance.new("TextBox", inputWrap)
+    input.Size = UDim2.new(1, -80, 1, 0)
+    input.Position = UDim2.new(0, 14, 0, 0)
+    input.BackgroundTransparency = 1
+    input.Text = ""
+    input.Font = Enum.Font.Gotham
+    input.TextSize = 12
+    input.TextColor3 = C.text
+    input.PlaceholderText = "SXNT-XXXX-XXXX-XXXX"
+    input.PlaceholderColor3 = C.mutedDark
+    input.ClearTextOnFocus = false
+    input.TextXAlignment = Enum.TextXAlignment.Left
+    input.ZIndex = 16
+
+    local pasteBtn = Instance.new("TextButton", inputWrap)
+    pasteBtn.Text = T.paste_btn
+    pasteBtn.Font = Enum.Font.GothamBold
+    pasteBtn.TextSize = 10
+    pasteBtn.TextColor3 = C.accent
+    pasteBtn.Size = UDim2.new(0, 62, 1, -12)
+    pasteBtn.Position = UDim2.new(1, -70, 0, 6)
+    pasteBtn.BackgroundColor3 = C.surface3
+    pasteBtn.BorderSizePixel = 0
+    pasteBtn.AutoButtonColor = false
+    pasteBtn.ZIndex = 16
+    corner(pasteBtn, 8)
+    attachRipple(pasteBtn, C.accent)
+    attachHoverSound(pasteBtn)
+
+    pasteBtn.MouseEnter:Connect(function()
+        tw(pasteBtn, 0.15, {BackgroundColor3 = C.accent, TextColor3 = Color3.new(1,1,1)})
+    end)
+    pasteBtn.MouseLeave:Connect(function()
+        tw(pasteBtn, 0.15, {BackgroundColor3 = C.surface3, TextColor3 = C.accent})
+    end)
+
+    local keyPreview = Instance.new("TextLabel", content)
+    keyPreview.Text = ""
+    keyPreview.Font = Enum.Font.Gotham
+    keyPreview.TextSize = 10
+    keyPreview.TextColor3 = C.green
+    keyPreview.TextTransparency = 1
+    keyPreview.Size = UDim2.new(1, -100, 0, 14)
+    keyPreview.Position = UDim2.new(0, timelineX + 22, 0, s2Y + 94)
+    keyPreview.BackgroundTransparency = 1
+    keyPreview.TextXAlignment = Enum.TextXAlignment.Left
+    keyPreview.ZIndex = 14
+
+    local function updateKeyPreview()
+        local t = input.Text:gsub("%s+", "")
+        if isValidKeyFormat(t) then
+            keyPreview.Text = T.key_preview .. "  " .. t:sub(1,9) .. "••••••••"
+            tw(keyPreview, 0.3, {TextTransparency = 0})
+        else
+            tw(keyPreview, 0.2, {TextTransparency = 1})
+        end
+    end
+
+    pasteBtn.MouseButton1Click:Connect(function()
+        clickSound()
+        local clip
+        pcall(function() if typeof(getclipboard)=="function" then clip = getclipboard() end end)
+        if clip and clip~="" then
+            input.Text = clip:gsub("%s+","")
+            updateKeyPreview()
+            tw(inputWrap, 0.2, {BackgroundColor3 = C.surface3})
+            task.delay(0.3, function() tw(inputWrap, 0.4, {BackgroundColor3 = C.surface2}) end)
+        end
+    end)
+
+    -- STEP 3
+    local s3Title = Instance.new("TextLabel", content)
+    s3Title.Text = T.step3
+    s3Title.Font = Enum.Font.GothamBold
+    s3Title.TextSize = 14
+    s3Title.TextColor3 = C.text
+    s3Title.Size = UDim2.new(1, -100, 0, 22)
+    s3Title.Position = UDim2.new(0, timelineX + 22, 0, s3Y)
+    s3Title.BackgroundTransparency = 1
+    s3Title.TextXAlignment = Enum.TextXAlignment.Left
+    s3Title.ZIndex = 14
+
+    local s3Body = Instance.new("TextLabel", content)
+    s3Body.Text = T.step3_body
+    s3Body.Font = Enum.Font.Gotham
+    s3Body.TextSize = 11
+    s3Body.TextColor3 = C.muted
+    s3Body.Size = UDim2.new(1, -100, 0, 22)
+    s3Body.Position = UDim2.new(0, timelineX + 22, 0, s3Y + 22)
+    s3Body.BackgroundTransparency = 1
+    s3Body.TextXAlignment = Enum.TextXAlignment.Left
+    s3Body.TextYAlignment = Enum.TextYAlignment.Top
+    s3Body.TextWrapped = true
+    s3Body.ZIndex = 14
+
+    -- ACTIVATE
+    local actY = s3Y + 52
+    local actBtn = Instance.new("TextButton", content)
+    actBtn.Text = T.activate
+    actBtn.Font = Enum.Font.GothamBold
+    actBtn.TextSize = 14
+    actBtn.TextColor3 = Color3.new(1, 1, 1)
+    actBtn.Size = UDim2.new(1, -44, 0, 46)
+    actBtn.Position = UDim2.new(0, 22, 0, actY)
+    actBtn.BackgroundColor3 = C.accent
+    actBtn.BorderSizePixel = 0
+    actBtn.AutoButtonColor = false
+    actBtn.ZIndex = 15
+    corner(actBtn, 12)
+    grad(actBtn, Color3.fromRGB(70, 130, 255), Color3.fromRGB(120, 80, 230), 0)
+
+    attachRipple(actBtn, Color3.new(1,1,1))
+    attachHoverSound(actBtn)
+    actBtn.MouseEnter:Connect(function()
+        tw(actBtn, 0.25, {Size = UDim2.new(1, -40, 0, 48)}, Enum.EasingStyle.Quint)
+    end)
+    actBtn.MouseLeave:Connect(function()
+        tw(actBtn, 0.25, {Size = UDim2.new(1, -44, 0, 46)}, Enum.EasingStyle.Quint)
+    end)
+
+    if not IS_MOBILE then
+        local hint = Instance.new("TextLabel", content)
+        hint.Text = T.hint_enter
+        hint.Font = Enum.Font.Gotham
+        hint.TextSize = 9
+        hint.TextColor3 = C.mutedDark
+        hint.TextTransparency = 0.4
+        hint.Size = UDim2.new(1, -44, 0, 12)
+        hint.Position = UDim2.new(0, 22, 0, actY + 50)
+        hint.BackgroundTransparency = 1
+        hint.TextXAlignment = Enum.TextXAlignment.Center
+        hint.ZIndex = 14
+    end
+
+    -- STATUS
+    local statusY = actY + (IS_MOBILE and 60 or 66)
+    local statusWrap = Instance.new("Frame", content)
+    statusWrap.AnchorPoint = Vector2.new(0.5, 0.5)
+    statusWrap.Position = UDim2.new(0.5, 0, 0, statusY + 8)
+    statusWrap.Size = UDim2.new(1, -80, 0, 16)
+    statusWrap.BackgroundTransparency = 1
+    statusWrap.ZIndex = 14
+
+    local statusDot = Instance.new("Frame", statusWrap)
+    statusDot.Size = UDim2.new(0, 6, 0, 6)
+    statusDot.Position = UDim2.new(0, 0, 0.5, -3)
+    statusDot.BackgroundColor3 = C.muted
+    statusDot.BorderSizePixel = 0
+    statusDot.ZIndex = 15
+    cornerPct(statusDot, 1)
+
+    local statusLbl = Instance.new("TextLabel", statusWrap)
+    statusLbl.Text = T.status_idle
+    statusLbl.Font = Enum.Font.Gotham
+    statusLbl.TextSize = 12
+    statusLbl.TextColor3 = C.muted
+    statusLbl.Position = UDim2.new(0, 14, 0, 0)
+    statusLbl.Size = UDim2.new(1, -14, 1, 0)
+    statusLbl.BackgroundTransparency = 1
+    statusLbl.TextXAlignment = Enum.TextXAlignment.Left
+    statusLbl.ZIndex = 15
+
+    local function setStatus(text, kind)
+        tw(statusLbl, 0.15, {TextTransparency = 1})
+        task.delay(0.12, function()
+            if not statusLbl.Parent then return end
+            statusLbl.Text = text
+            tw(statusLbl, 0.25, {TextTransparency = 0})
+        end)
+        local col = C.muted
+        if kind == "success" then col = C.green
+        elseif kind == "error" then col = C.red
+        elseif kind == "checking" or kind == "info" then col = C.accent
+        end
+        tw(statusLbl, 0.25, {TextColor3 = col})
+        tw(statusDot, 0.25, {BackgroundColor3 = col})
+    end
+
+    -- LANGUAGE
+    local langY = CARD_H - 40
+    local langHolder = Instance.new("Frame", content)
+    langHolder.AnchorPoint = Vector2.new(0.5, 0.5)
+    langHolder.Position = UDim2.new(0.5, 0, 0, langY)
+    langHolder.Size = UDim2.new(0, 240, 0, 26)
+    langHolder.BackgroundColor3 = C.surface2
+    langHolder.BackgroundTransparency = 0.2
+    langHolder.BorderSizePixel = 0
+    langHolder.ZIndex = 14
+    corner(langHolder, 8)
+    stroke(langHolder, C.border, 1, 0.4)
+    local langList = Instance.new("UIListLayout", langHolder)
+    langList.FillDirection = Enum.FillDirection.Horizontal
+    langList.Padding = UDim.new(0, 3)
+    langList.HorizontalAlignment = Enum.HorizontalAlignment.Center
+    langList.VerticalAlignment = Enum.VerticalAlignment.Center
+
+    for _, code in ipairs({"ENG","UA","TR","RUS"}) do
+        local lb = Instance.new("TextButton", langHolder)
+        lb.Text = code
+        lb.Font = Enum.Font.GothamBold
+        lb.TextSize = 9
+        lb.TextColor3 = (code == currentLang) and Color3.new(1,1,1) or C.muted
+        lb.Size = UDim2.new(0, 53, 0, 20)
+        lb.BackgroundColor3 = (code == currentLang) and C.accent or C.surface3
+        lb.BackgroundTransparency = (code == currentLang) and 0 or 0.5
+        lb.BorderSizePixel = 0
+        lb.AutoButtonColor = false
+        lb.ZIndex = 15
+        corner(lb, 6)
+        if code == currentLang then grad(lb, C.accent, C.accent2, 45) end
+        lb.MouseEnter:Connect(function()
+            if code ~= currentLang then
+                hoverSound()
+                tw(lb, 0.15, {BackgroundTransparency = 0, BackgroundColor3 = C.surface3, TextColor3 = C.text})
+            end
+        end)
+        lb.MouseLeave:Connect(function()
+            if code ~= currentLang then
+                tw(lb, 0.15, {BackgroundTransparency = 0.5, BackgroundColor3 = C.surface3, TextColor3 = C.muted})
+            end
+        end)
+        lb.MouseButton1Click:Connect(function()
+            if code == currentLang then return end
+            clickSound()
+            currentLang = code
+            saveLang(code)
+            cleanup(); gui:Destroy()
+            buildUI(onActivated)
+        end)
+    end
+
+    -- FOOTER
+    local footer = Instance.new("TextLabel", content)
+    footer.Text = T.footer
+    footer.Font = Enum.Font.Gotham
+    footer.TextSize = 9
+    footer.TextColor3 = C.mutedDark
+    footer.Size = UDim2.new(1, -44, 0, 14)
+    footer.Position = UDim2.new(0, 22, 0, CARD_H - 18)
+    footer.BackgroundTransparency = 1
+    footer.TextXAlignment = Enum.TextXAlignment.Center
+    footer.ZIndex = 14
+
+    -- COVER
+    local cover = Instance.new("Frame", card)
+    cover.Size = UDim2.new(1, 0, 1, 0)
+    cover.BackgroundColor3 = Color3.fromRGB(14, 15, 22)
+    cover.BackgroundTransparency = 0
+    cover.BorderSizePixel = 0
+    cover.ZIndex = 50
+    corner(cover, 20)
+
+    local errFlash = Instance.new("Frame", card)
+    errFlash.Size = UDim2.new(1, 0, 1, 0)
+    errFlash.BackgroundColor3 = C.red
+    errFlash.BackgroundTransparency = 1
+    errFlash.BorderSizePixel = 0
+    errFlash.ZIndex = 55
+    corner(errFlash, 20)
+
+    local okFlash = Instance.new("Frame", card)
+    okFlash.Size = UDim2.new(1, 0, 1, 0)
+    okFlash.BackgroundColor3 = C.green
+    okFlash.BackgroundTransparency = 1
+    okFlash.BorderSizePixel = 0
+    okFlash.ZIndex = 55
+    corner(okFlash, 20)
+
+    -- ENTRANCE
+    tw(card, 0.85, {Size = UDim2.new(0, CARD_W, 0, CARD_H)}, Enum.EasingStyle.Back, Enum.EasingDirection.Out)
+    task.delay(0.6, function()
+        tw(cover, 0.5, {BackgroundTransparency = 1}, Enum.EasingStyle.Quint)
+        task.delay(0.6, function() if cover.Parent then cover:Destroy() end end)
+    end)
+
+    -- STATE
+    local step1Done = false
+    local step2Done = false
+    local step3Done = false
+    local checking = false
+
+    getBtn.MouseButton1Click:Connect(function()
+        clickSound()
+        pcall(function() setclipboard(KEY_LINK_URL) end)
+        pcall(function() if typeof(openbrowser)=="function" then openbrowser(KEY_LINK_URL) end end)
+        local old = getBtn.Text
+        getBtn.Text = "OK - " .. T.copied
+        task.delay(2, function() if getBtn.Parent then getBtn.Text = old end end)
+        if not step1Done then
+            step1Done = true
+            markStepDone(s1)
+            tw(timelineFill, 0.7, {Size = UDim2.new(1, 0, 0, fillStep1)}, Enum.EasingStyle.Quint)
+        end
+    end)
+
+    input:GetPropertyChangedSignal("Text"):Connect(function()
+        local t = input.Text:gsub("%s+", "")
+        local valid = isValidKeyFormat(t)
+        updateKeyPreview()
+        if valid and not step2Done then
+            step2Done = true
+            markStepDone(s2)
+            tw(timelineFill, 0.7, {Size = UDim2.new(1, 0, 0, fillStep2)}, Enum.EasingStyle.Quint)
+        elseif not valid and step2Done and not step3Done and not checking then
+            step2Done = false
+            resetStep(s2)
+            tw(timelineFill, 0.5, {Size = UDim2.new(1, 0, 0, step1Done and fillStep1 or 0)}, Enum.EasingStyle.Quint)
+        end
+    end)
+
+    -- CONFETTI
+    local function spawnConfetti()
+        for i = 1, 20 do
+            local p = Instance.new("Frame", content)
+            local sz = math.random(4, 7)
+            p.Size = UDim2.new(0, sz, 0, sz)
+            p.Position = UDim2.new(0.5, 0, 0, actY + 25)
+            p.BackgroundColor3 = (i % 3 == 0) and C.green or ((i % 3 == 1) and C.accent or C.accent2)
+            p.BorderSizePixel = 0
+            p.ZIndex = 30
+            cornerPct(p, 1)
+            local angle = (i / 20) * math.pi * 2 + math.random() * 0.3
+            local dist = math.random(80, 220)
+            local tx = math.cos(angle) * dist
+            local peakY = -math.random(60, 140)
+            tw(p, 0.45, {Position = UDim2.new(0.5, tx * 0.7, 0, actY + 25 + peakY)}, Enum.EasingStyle.Quad, Enum.EasingDirection.Out)
+            task.delay(0.45, function()
+                if not p.Parent then return end
+                tw(p, 1.1, {Position = UDim2.new(0.5, tx, 0, actY + 260), Rotation = math.random(-360, 360), BackgroundTransparency = 1}, Enum.EasingStyle.Quad, Enum.EasingDirection.In)
+            end)
+            task.delay(1.6, function() if p.Parent then p:Destroy() end end)
+        end
+    end
+
+    local function doActivate()
+        if checking then return end
+        local key = input.Text:gsub("%s+", "")
+        if key == "" then
+            setStatus(T.no_key, "error")
+            errorSound()
+            shakeElement(card, 12, 0.4)
+            errFlash.BackgroundTransparency = 0.75
+            tw(errFlash, 0.4, {BackgroundTransparency = 1})
+            return
+        end
+
+        clickSound()
+        checking = true
+        actBtn.Interactable = false
+        actBtn.Text = "..."
+        setStatus(T.status_checking, "checking")
+
+        task.spawn(function()
+            local hwid = getHWID()
+            local url = SERVER_URL .. "/validate?key=" .. key .. "&hwid=" .. hwid
+            local _, body = httpGet(url)
+            local ok, data = pcall(HttpService.JSONDecode, HttpService, body or "{}")
+
+            if not ok or not data or not data.valid then
+                local reason = data and data.reason or "connection_error"
+                local msg = T.err_invalid
+                if reason == "hwid_mismatch" then msg = T.err_hwid
+                elseif type(reason)=="string" and reason:find("^banned") then msg = T.err_banned
+                elseif reason == "inactive" then msg = T.err_inactive
+                elseif reason == "expired" then msg = T.err_expired
+                elseif reason == "rate_limited" then msg = T.err_rate
+                elseif reason == "connection_error" or (type(reason)=="string" and reason:find("Connection")) then msg = T.err_net end
+
+                setStatus(msg, "error")
+                errorSound()
+                shakeElement(card, 14, 0.5)
+                errFlash.BackgroundTransparency = 0.75
+                tw(errFlash, 0.5, {BackgroundTransparency = 1})
+                actBtn.Interactable = true
+                actBtn.Text = T.activate
+                checking = false
+                return
+            end
+
+            saveKey(key)
+            setStatus(T.status_success, "success")
+            successSound()
+            actBtn.Text = "OK - " .. T.status_success
+            tw(actBtn, 0.3, {BackgroundColor3 = C.green})
+
+            if not step2Done then
+                step2Done = true
+                markStepDone(s2, true)
+            end
+            if not step3Done then
+                step3Done = true
+                markStepDone(s3)
+                tw(timelineFill, 0.9, {Size = UDim2.new(1, 0, 0, fillStep3)}, Enum.EasingStyle.Quint)
+            end
+
+            okFlash.BackgroundTransparency = 0.6
+            tw(okFlash, 0.6, {BackgroundTransparency = 1})
+
+            spawnConfetti()
+
+            task.wait(1.3)
+            checking = false
+
+            local fadeCover = Instance.new("Frame", card)
+            fadeCover.Size = UDim2.new(1, 0, 1, 0)
+            fadeCover.BackgroundColor3 = Color3.fromRGB(14, 15, 22)
+            fadeCover.BackgroundTransparency = 1
+            fadeCover.BorderSizePixel = 0
+            fadeCover.ZIndex = 50
+            corner(fadeCover, 20)
+            tw(fadeCover, 0.35, {BackgroundTransparency = 0}, Enum.EasingStyle.Quint)
+            task.wait(0.4)
+
+            tw(card, 0.4, {Size = UDim2.new(0, 0, 0, 0)}, Enum.EasingStyle.Back, Enum.EasingDirection.In)
+            tw(shadow1, 0.4, {BackgroundTransparency = 1}, Enum.EasingStyle.Quad)
+            task.wait(0.5)
+
+            cleanup()
+            gui:Destroy()
+            if onActivated then onActivated(key) end
+        end)
+    end
+
+    actBtn.MouseButton1Click:Connect(doActivate)
+
+    if not IS_MOBILE then
+        track(UserInputService.InputBegan:Connect(function(input, gp)
+            if gp then return end
+            if input.KeyCode == Enum.KeyCode.Escape then
+                closeUI()
+            end
+        end))
+    end
+
+    input.Focused:Connect(function()
+        tw(inputStroke, 0.25, {Color = C.accent, Transparency = 0})
+        tw(inputWrap, 0.25, {BackgroundColor3 = C.surface3})
+        if not step2Done then
+            tw(s2.stroke, 0.25, {Color = C.accent, Transparency = 0})
+            tw(s2.num, 0.25, {TextColor3 = C.accent})
+        end
+    end)
+    input.FocusLost:Connect(function(enter)
+        tw(inputStroke, 0.25, {Color = C.border, Transparency = 0})
+        tw(inputWrap, 0.25, {BackgroundColor3 = C.surface2})
+        if not step2Done then
+            tw(s2.stroke, 0.25, {Color = C.border, Transparency = 0})
+            tw(s2.num, 0.25, {TextColor3 = C.muted})
+        end
+        if enter and not IS_MOBILE then doActivate() end
+    end)
+
+    if not IS_MOBILE then
+        track(UserInputService.InputBegan:Connect(function(inp, gp)
+            if gp then return end
+            if inp.KeyCode == Enum.KeyCode.Return then
+                if not input:IsFocused() then
+                    doActivate()
+                end
+            end
+        end))
+    end
+
+    if not IS_MOBILE then
+        task.delay(1.2, function()
+            if input.Parent then
+                pcall(function() input:CaptureFocus() end)
+            end
+        end)
+    end
+end
+
+-- ═══════════ ENTRY POINT ═══════════
+local existingKey = findExistingKey()
+local function start(key)
+    if not launchMain(key) then warn("[SXNT] Launch failed") end
+end
+
+if existingKey then
+    start(existingKey)
+else
+    buildUI(function(k) start(k) end)
+end
